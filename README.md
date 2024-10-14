@@ -1,41 +1,55 @@
 # Deploy-Into-Azure-using-Terraform
 
 
-Here is a **Mermaid diagram** representing the steps involved in using Azure DevOps with Terraform to deploy resources in Azure, including Azure Key Vault for managing Service Principal credentials.
+Here's a detailed **Mermaid flowchart** diagram showing the process of using Azure DevOps with Terraform to deploy resources in Azure, including the use of **Azure Key Vault** for managing Service Principal Identities (SPI) and **Azure Blueprint** at the management group level.
 
 ```mermaid
 graph TD
-    A[Start] --> B[Create Azure DevOps Project]
-    B --> C[Create Git Repository for Terraform files]
-    C --> D[Create Service Principal in Azure]
-    D --> E[Store Service Principal credentials in Azure Key Vault]
-    E --> F[Set up Azure DevOps Pipeline]
-    F --> G[Configure Service Connection in Azure DevOps]
-    G --> H[Create Terraform Configuration files]
-    H --> I[Create Azure Pipelines YAML file]
-    I --> J[Define steps for 'terraform init', 'plan', and 'apply']
-    J --> K[Run the Pipeline in Azure DevOps]
-    K --> L[Terraform deploys resources to Azure]
-    L --> M[Azure Key Vault provides credentials to access resources]
-    M --> N[Monitor the Pipeline for Success or Failure]
-    N --> O[Resources Deployed Successfully]
+    A[Start: Developer Pushes Code to Azure DevOps] -->|Trigger| B[Azure DevOps Pipeline Initiated]
+    
+    B --> C[Fetch Terraform Scripts from Git Repository]
+    
+    C --> D[Azure Key Vault Authentication]
+    D -->|Service Principal ID| E[Fetch Service Principal from Key Vault]
+    
+    E --> F[Azure DevOps Access Azure Resources]
+    
+    F --> G[Apply Azure Blueprint]
+    G -->|Management Group Policy| H[Azure Blueprint Enforces Compliance]
+    
+    H --> I[Terraform Initializes Backend]
+    I --> J[State Stored in Azure Storage]
+    
+    J --> K[Terraform Plan Execution]
+    
+    K --> L[Manual Approval Stage]
+    L --> M[Terraform Apply]
+    
+    M --> N[Deploy Azure Resources]
+    N --> O1[Deploy Azure SQL]
+    N --> O2[Deploy Azure Logic App]
+    
+    O1 --> P[Terraform Updates State in Azure Storage]
+    O2 --> P
+    
+    P --> Q[Monitor Deployment in Azure DevOps]
+    
+    Q --> R[End: Resources Successfully Deployed]
+    
+    subgraph Key Vault and Security
+        D -->|Access Control| E
+        E -->|Rotation Policy| E[Key Vault Manages Service Principal Certificates]
+    end
+    
+    subgraph Blueprint Enforcement
+        G -->|Management Group| H
+    end
 ```
 
-### Breakdown of Steps in the Diagram:
-- **A**: Start the process.
-- **B**: Create a new project in Azure DevOps.
-- **C**: Set up a Git repository where your Terraform configuration files will reside.
-- **D**: Create a Service Principal (SP) in Azure for authentication purposes.
-- **E**: Store the SP credentials securely in Azure Key Vault.
-- **F**: Set up an Azure DevOps pipeline for automation.
-- **G**: Configure the pipeline to access the SP credentials via a Service Connection.
-- **H**: Write Terraform configuration files (`*.tf`) to define your Azure resources.
-- **I**: Create the pipeline YAML file (`azure-pipelines.yml`) in the repo to automate Terraform steps.
-- **J**: Define Terraform steps for initialization (`init`), planning (`plan`), and applying (`apply`) changes.
-- **K**: Trigger the pipeline run.
-- **L**: Terraform executes the deployment of resources (e.g., VMs, SQL databases) into Azure.
-- **M**: Azure Key Vault manages the Service Principal credentials used by Terraform for authentication.
-- **N**: Monitor the pipeline for successful deployment or handle failures.
-- **O**: Confirm that the resources have been deployed successfully.
+### Explanation:
+- **Key Vault and Security**: Shows how Azure Key Vault is used to store and manage Service Principal credentials, including automated certificate rotation.
+- **Blueprint Enforcement**: Demonstrates how Azure Blueprints are applied to ensure compliance at the management group level before any resources are deployed.
+- **Terraform Steps**: Shows the flow from initializing Terraform, running a `plan`, manual approval (if necessary), and `apply` stages that deploy resources such as Azure SQL and Logic App.
+- **State Management**: Terraform state is stored in Azure Storage, ensuring consistent state tracking across different runs.
 
-This flow emphasizes both the Terraform pipeline and the secure management of Service Principal credentials via Azure Key Vault.
+This flow represents a complete lifecycle from code push to resource deployment, ensuring security and governance using Azure Key Vault and Blueprints.
