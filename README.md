@@ -1,82 +1,67 @@
 # Deploy-Into-Azure-using-Terraform
 
-Here’s a detailed **Mermaid sequence diagram** that visually represents the steps involved in using Azure DevOps (AzDevOps) with Terraform (TF) to deploy resources into Azure, with the inclusion of **Azure Key Vault** for managing Service Principal (SPI) certificates, **certificate rotation**, **Azure Blueprint at the management group level**, and **Landing Zones for Networking Hub-Spoke architecture**.
+Here's a detailed mermaid sequence diagram with a use case that integrates **Azure Key Vault** for managing Service Principal Identity (SPI) using certificates and rotation, **Azure Blueprint** for governance at the management group level, and a default **landing zone** for networking.
+
+### Use Case: 
+You have an Azure environment with a management group to enforce policies via **Azure Blueprints**. Resources are deployed using **Azure DevOps pipelines** with **Terraform**, where **Service Principal identities** (SPIs) authenticate via certificates stored in **Azure Key Vault**. A **network landing zone** is also established, governed by the blueprint.
 
 ```mermaid
 sequenceDiagram
     participant DevOpsEngineer as DevOps Engineer
-    participant AzureDevOps as Azure DevOps Pipeline
+    participant AzDevOps as Azure DevOps Pipeline
     participant KeyVault as Azure Key Vault
-    participant Terraform as Terraform
-    participant AzureMgmtGroup as Azure Management Group
-    participant AzureBlueprint as Azure Blueprint
-    participant Networking as Networking Hub-Spoke
-    participant AzureSQL as Azure SQL
-    participant LogicApp as Logic App
+    participant Blueprint as Azure Blueprints
+    participant MgmtGroup as Management Group
+    participant Azure as Azure Resources
+    participant LandingZone as Default Network Landing Zone
 
-    DevOpsEngineer->>AzureDevOps: Push Terraform code to Repo
-    AzureDevOps->>KeyVault: Retrieve Service Principal Certificate
-    KeyVault-->>AzureDevOps: SPI Certificate & Rotation
-    AzureDevOps->>Terraform: Initialize Terraform (azurerm provider)
+    DevOpsEngineer->>AzDevOps: Push Terraform Config Files (Main.tf, Variables.tf)
     
-    Terraform->>AzureBlueprint: Check Azure Blueprint for compliance
-    AzureBlueprint-->>Terraform: Approved policies (management group level)
+    Note over AzDevOps: Trigger Pipeline
     
-    Terraform->>AzureMgmtGroup: Apply Policies at Management Group level
-    AzureMgmtGroup-->>Terraform: Compliance Check Passed
-
-    Terraform->>Networking: Deploy Hub-Spoke VNet & Subnets
-    Networking-->>Terraform: Hub-Spoke network provisioned
+    AzDevOps->>KeyVault: Request SPI Certificate (Azure Service Connection)
+    KeyVault-->>AzDevOps: Return SPI Certificate
     
-    Terraform->>AzureSQL: Deploy Azure SQL Server and Database
-    AzureSQL-->>Terraform: Azure SQL created
+    AzDevOps->>Blueprint: Request Policy Compliance Check
+    Blueprint-->>AzDevOps: Check Management Group Policies
+    
+    AzDevOps->>LandingZone: Provision Network Resources (VNet, Subnets, NSGs)
+    LandingZone-->>AzDevOps: Default Network Setup Complete
+    
+    AzDevOps->>Azure: Deploy Resources (e.g., Azure SQL, Logic App)
+    Azure-->>AzDevOps: Resources Provisioned Successfully
+    
+    Note over AzDevOps, Azure: Resources Deployed with Policy Compliance
 
-    Terraform->>LogicApp: Deploy Logic App Workflow
-    LogicApp-->>Terraform: Logic App created
-
-    AzureDevOps->>AzureDevOps: Plan & Apply Terraform deployment
-
-    loop Rotation Policy
-      KeyVault->>KeyVault: Certificate expires
-      KeyVault-->>AzureDevOps: Rotate certificate (Auto-renewal)
-      AzureDevOps->>Terraform: Update SPI with new certificate
+    loop Certificate Rotation Policy
+        KeyVault->>AzDevOps: Rotate SPI Certificate Automatically
+        AzDevOps-->>KeyVault: Update SPI with Rotated Certificate
     end
-
-    AzureDevOps->>DevOpsEngineer: Notify deployment status
+    
+    Note over KeyVault, AzDevOps: Certificate Rotation Maintains Security
 ```
 
-### Explanation of the Steps:
-1. **DevOps Engineer**:
-   - Pushes Terraform configuration to the **Azure DevOps** repository. This starts the CI/CD pipeline.
-  
-2. **Azure DevOps Pipeline**:
-   - **Azure DevOps** triggers the pipeline to deploy resources.
-   - Retrieves the **Service Principal Identity (SPI) certificate** from **Azure Key Vault** for authentication. **Azure Key Vault** manages the certificate rotation, and the pipeline will use this certificate to authenticate deployments.
-  
-3. **Terraform Initialization**:
-   - **Terraform** is initialized using the `azurerm` provider, and backend storage (e.g., Azure Storage) is used to store the Terraform state file.
+### Explanation of the Diagram Steps
 
-4. **Azure Blueprint Check**:
-   - **Terraform** checks for compliance with **Azure Blueprint** (assigned at the **management group** level). The blueprint ensures that the resources being deployed comply with organizational policies such as tagging, security, and resource limits.
+1. **DevOps Engineer Pushes Terraform Configurations**: The DevOps engineer pushes Terraform configurations (such as `main.tf` and `variables.tf`) to the **Azure DevOps Git repository**. This triggers a pipeline in Azure DevOps.
 
-5. **Management Group Policy Application**:
-   - Policies from the management group are applied to ensure that resources like VNets, Azure SQL, and Logic Apps are created in a compliant manner.
+2. **Azure DevOps Requests SPI Certificate**: The Azure DevOps pipeline authenticates using a **Service Principal Identity (SPI)**. It retrieves the associated certificate from **Azure Key Vault**, which has been configured to securely store and manage these certificates.
 
-6. **Networking Hub-Spoke Deployment**:
-   - **Terraform** provisions a Hub-Spoke network, deploying the virtual network (VNet), subnets, and NSGs.
-   
-7. **Azure SQL Deployment**:
-   - Terraform deploys an Azure SQL Server and database into the designated resource group, ensuring that the deployment adheres to the policies defined in the **Azure Blueprint**.
-   
-8. **Logic App Deployment**:
-   - **Terraform** deploys an **Azure Logic App** for workflow automation based on the configuration provided.
+3. **Policy Compliance Check with Azure Blueprints**: Before deploying resources, the pipeline checks with **Azure Blueprints** to ensure the resources being deployed comply with the policies defined at the **management group level** (e.g., security, tagging, and cost management policies).
 
-9. **Certificate Rotation Policy**:
-   - **Azure Key Vault** automatically rotates the SPI certificate based on the predefined rotation policy (e.g., 30 days before expiry).
-   - **Azure DevOps** fetches the new certificate from **Key Vault** during the next pipeline run and updates the **Terraform** SPI authentication.
+4. **Provision Network Resources in Landing Zone**: The pipeline provisions networking resources in a predefined **landing zone** for networking. This may include Virtual Networks (VNets), Subnets, Network Security Groups (NSGs), and User Defined Routes (UDRs) that are compliant with organizational standards.
 
-10. **Deployment Status**:
-   - **Azure DevOps** completes the deployment and notifies the **DevOps Engineer** of the deployment status (success/failure).
+5. **Deploy Resources (e.g., Azure SQL, Logic Apps)**: After networking is set up, the pipeline proceeds to deploy Azure resources, such as Azure SQL Databases and Logic Apps, using Terraform. These resources are now compliant with the governance policies enforced by the **Azure Blueprint**.
 
-### Final Thoughts:
-This sequence diagram incorporates key components such as **Azure Key Vault** for managing SPI certificates and rotation, **Azure Blueprints** for governance, and **Terraform** for deploying resources into a **Hub-Spoke network architecture** with additional resources like **Azure SQL** and **Logic Apps**. The diagram also highlights the interaction between these components and how they work together in an automated pipeline setup.
+6. **Certificate Rotation in Key Vault**: The **Azure Key Vault** manages and automatically rotates the SPI certificates periodically. The Azure DevOps pipeline is notified when certificates are rotated and can automatically retrieve and update the Service Principal with the new certificate, maintaining security.
+
+---
+
+### Key Components
+
+- **Azure Key Vault**: Stores the Service Principal's certificates securely, automates certificate rotation, and ensures that the certificates are updated without manual intervention.
+- **Azure Blueprints**: Enforces policies at the management group level to ensure that all resources deployed are compliant with organizational standards (security, governance, and cost management).
+- **Landing Zone**: A pre-configured networking environment (Virtual Networks, Subnets, etc.) that provides a secure and organized foundation for resource deployment.
+- **Azure DevOps Pipeline**: Automates the deployment of resources using Terraform, retrieving certificates from Azure Key Vault for secure authentication.
+
+This workflow ensures secure, policy-compliant resource deployment into Azure using a combination of Terraform, Azure DevOps, Key Vault, and Azure Blueprints.
